@@ -94,7 +94,7 @@ esp_err_t button_init(button_t * const me, gpio_num_t gpio, button_mode_e mode) 
 	gpio_conf.pin_bit_mask = 1ULL << me->gpio;
 	gpio_conf.mode = GPIO_MODE_INPUT;
 
-	if(mode != FALLING_MODE || mode != RISING_MODE) {
+	if(mode != FALLING_MODE && mode != RISING_MODE) {
 		ESP_LOGE(TAG, "Error in mode argument");
 
 		return ESP_ERR_INVALID_ARG;
