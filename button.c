@@ -3,7 +3,8 @@
   * @file           : button.c
   * @author         : Mauricio Barroso Benavides
   * @date           : Mar 20, 2022
-  * @brief          : todo: write brief
+  * @brief          : This file provides code for the configuration and control
+  *                   of bounce of the buttons instances
   ******************************************************************************
   * @attention
   *
