@@ -93,10 +93,11 @@ typedef struct {
 
 /* Exported functions prototypes ---------------------------------------------*/
 /**
-  * @brief Create a button
+  * @brief Create a button instance
   *
+  * @param me Pointer to button_t structure
   * @param gpio GPIO number to attach button
-  * @param ode Button trigger mode, can be rising or falling
+  * @param mode Button trigger mode, can be rising or falling
   *
   * @retval
   * 	- ESP_OK on success
