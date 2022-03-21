@@ -102,7 +102,7 @@ typedef struct {
   * 	- ESP_OK on success
   * 	- ESP_ERR_INVALID_ARG if the argument is invalid
   */
-esp_err_t button_create(button_t * const me, gpio_num_t gpio, button_mode_e mode);
+esp_err_t button_init(button_t * const me, gpio_num_t gpio, button_mode_e mode);
 
 /**
   * @brief Register a button callback function
