@@ -1,4 +1,4 @@
-# ESP IDF Button Library
+# ESP-IDF Button Component
 ## Features
 
 - Support 3 different functions based on the button press time (short, medium and long)
