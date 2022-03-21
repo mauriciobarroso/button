@@ -1,0 +1,21 @@
+menu "Button Configuration"
+
+    config BUTTON_DEBOUNCE_SHORT_TIME
+        int "Short time"
+        default 30
+        help
+        	Set short button press time in miliseconds.
+        	
+    config BUTTON_DEBOUNCE_MEDIUM_TIME
+        int "Medium time"
+        default 3000
+        help
+        	Set medium button press time in miliseconds.
+        	
+    config BUTTON_DEBOUNCE_LONG_TIME
+        int "Long time"
+        default 10000
+        help
+        	Set short button press time in miliseconds.
+
+endmenu
