@@ -47,11 +47,18 @@ extern "C" {
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/timers.h"
 
 #include "driver/gpio.h"
 
 /* Exported types ------------------------------------------------------------*/
 typedef void (* button_cb_t)(void *);
+
+/**/
+typedef struct {
+	button_cb_t function;
+	void * arg;
+} button_function_t;
 
 typedef enum {
 	FALLING_MODE = 0,
@@ -60,10 +67,10 @@ typedef enum {
 
 /* Button states */
 typedef enum {
+	DOWN_STATE = 0,
 	UP_STATE,
-	DOWN_STATE,
-	FALLING_STATE,
-	RISING_STATE
+//	FALLING_STATE,
+//	RISING_STATE
 } button_state_e;
 
 /**/
@@ -74,17 +81,17 @@ typedef enum {
 } button_time_e;
 
 typedef struct {
-	button_state_e state;			/*!< Button state */
-	button_mode_e mode;				/*!< Button mode activation */
-	gpio_num_t gpio;				/*!< Button GPIO number */
-	TickType_t tick_counter;		/*!< Tick counter */
-	button_cb_t short_cb;			/*!< Short press callback function code */
-	button_cb_t medium_cb;			/*!< Medium press callback function code */
-	button_cb_t long_cb;			/*!< Long press callback function code */
-	void * short_arg;				/*!< Short press callback function argument */
-	void * medium_arg;				/*!< Medium press callback function argument */
-	void * long_arg;				/*!< Long press callback function argument */
-	EventGroupHandle_t event_group;	/*!< Button FreeRTOS event group */
+	button_state_e state;				/*!< Button state */
+	button_mode_e mode;					/*!< Button mode activation */
+	gpio_num_t gpio;					/*!< Button GPIO number */
+	TickType_t tick_counter;			/*!< Tick counter */
+	button_function_t short_function;	/*!< Short press callback function structure */
+	button_function_t medium_function;	/*!< Medium press callback function structure */
+	button_function_t long_function;	/*!< Long press callback function structure */
+	EventGroupHandle_t event_group;		/*!< Button FreeRTOS event group */
+	UBaseType_t task_priority;			/*!< Button FreeRTOS task priority */
+	uint32_t task_stack_size;			/*!< Button FreeRTOS task stack size */
+	TimerHandle_t timer;
 } button_t;
 
 /* Exported constants --------------------------------------------------------*/
@@ -93,24 +100,30 @@ typedef struct {
 
 /* Exported functions prototypes ---------------------------------------------*/
 /**
-  * @brief Create a button instance
+  * @brief Initialize a button instance
   *
   * @param me Pointer to button_t structure
   * @param gpio GPIO number to attach button
   * @param mode Button trigger mode, can be rising or falling
+  * @param task_priority Button task priority
+  * @param task_stack_size Button task stack size
   *
   * @retval
   * 	- ESP_OK on success
   * 	- ESP_ERR_INVALID_ARG if the argument is invalid
   */
-esp_err_t button_init(button_t * const me, gpio_num_t gpio, button_mode_e mode);
+esp_err_t button_init(button_t * const me,
+		gpio_num_t gpio,
+		button_mode_e mode,
+		UBaseType_t task_priority,
+		uint32_t task_stack_size);
 
 /**
   * @brief Register a button callback function
   *
-  * @param button_handle A button handle to register callback function
+  * @param me Pointer to button_t structure
   * @param time Button press time to register callback function
-  * @param cb Callback function code
+  * @param function Callback function code
   * @param arg Pointer to callback function argument
   *
   * @retval
@@ -118,12 +131,15 @@ esp_err_t button_init(button_t * const me, gpio_num_t gpio, button_mode_e mode);
   * 	- ESP_NO_MEM if is out of memory
   * 	- ESP_ERR_INVALID_ARG if the argument is invalid
   */
-esp_err_t button_register_cb(button_t * const me, button_time_e time, button_cb_t cb, void * arg);
+esp_err_t button_register_cb(button_t * const me,
+		button_time_e time,
+		button_cb_t function,
+		void * arg);
 
 /**
   * @brief Unregister a button callback function
   *
-  * @param button_handle A button handle to delete
+  * @param me Pointer to button_t structure
   * @param time Button press time to unregister callback function
   *
   *
