@@ -104,7 +104,6 @@ typedef struct {
   *
   * @param me Pointer to button_t structure
   * @param gpio GPIO number to attach button
-  * @param mode Button trigger mode, can be rising or falling
   * @param task_priority Button task priority
   * @param task_stack_size Button task stack size
   *
@@ -114,7 +113,6 @@ typedef struct {
   */
 esp_err_t button_init(button_t * const me,
 		gpio_num_t gpio,
-		button_mode_e mode,
 		UBaseType_t task_priority,
 		uint32_t task_stack_size);
 

@@ -65,7 +65,6 @@ static const char * TAG = "button";
 /* Exported functions --------------------------------------------------------*/
 esp_err_t button_init(button_t * const me,
 		gpio_num_t gpio,
-		button_mode_e mode,
 		UBaseType_t task_priority,
 		uint32_t task_stack_size) {
 	ESP_LOGI(TAG, "Initializing button component...");
@@ -103,13 +102,13 @@ esp_err_t button_init(button_t * const me,
 	gpio_conf.pin_bit_mask = 1ULL << me->gpio;
 	gpio_conf.mode = GPIO_MODE_INPUT;
 
-	if(mode != FALLING_MODE && mode != RISING_MODE) {
-		ESP_LOGE(TAG, "Error in mode argument");
+//	if(mode != FALLING_MODE && mode != RISING_MODE) {
+//		ESP_LOGE(TAG, "Error in mode argument");
+//
+//		return ESP_ERR_INVALID_ARG;
+//	}
 
-		return ESP_ERR_INVALID_ARG;
-	}
-
-	me->mode = mode;
+	me->mode = FALLING_MODE;
 
 	if(me->mode == FALLING_MODE) {
 		gpio_conf.pull_up_en = GPIO_PULLUP_ENABLE;
@@ -117,12 +116,12 @@ esp_err_t button_init(button_t * const me,
 		me->state = DOWN_STATE;
 		gpio_conf.intr_type = GPIO_INTR_NEGEDGE;
 	}
-	else {
-		gpio_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-		gpio_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-		me->state = UP_STATE;
-		gpio_conf.intr_type = GPIO_INTR_POSEDGE;
-	}
+//	else {
+//		gpio_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+//		gpio_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+//		me->state = UP_STATE;
+//		gpio_conf.intr_type = GPIO_INTR_POSEDGE;
+//	}
 
 //	gpio_conf.intr_type = GPIO_INTR_ANYEDGE;
 	ret = gpio_config(&gpio_conf);
@@ -169,8 +168,12 @@ esp_err_t button_init(button_t * const me,
     	return ESP_ERR_NO_MEM;
     }
 
-    /* todo: refactor and erase, test only */
-    me->timer = xTimerCreate("Test timer", BUTTON_SHORT_TIME, pdFALSE, (void *)me, timer_handler);
+    /* Creater FreeRTOS software timer to avoid bounce button */
+    me->timer = xTimerCreate("Test timer",
+    		BUTTON_SHORT_TIME,
+			pdFALSE,
+			(void *)me,
+			timer_handler); /* todo: implement error handler */
 
 	/* Return error code */
 	return ret;
