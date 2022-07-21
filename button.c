@@ -47,10 +47,10 @@
 #define BUTTON_MEDIUM_PRESS_BIT	BIT1
 #define BUTTON_LONG_PRESS_BIT	BIT2
 
-/*  */
-#define BUTTON_SHORT_TIME	pdMS_TO_TICKS(CONFIG_BUTTON_DEBOUNCE_SHORT_TIME)
-#define BUTTON_MEDIUM_TIME	pdMS_TO_TICKS(CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME)
-#define BUTTON_LONG_TIME	pdMS_TO_TICKS(CONFIG_BUTTON_DEBOUNCE_LONG_TIME)
+/* Button  */
+#define BUTTON_SHORT_TIME	CONFIG_BUTTON_DEBOUNCE_SHORT_TIME
+#define BUTTON_MEDIUM_TIME	CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME
+#define BUTTON_LONG_TIME	CONFIG_BUTTON_DEBOUNCE_LONG_TIME
 
 /* Private function prototypes -----------------------------------------------*/
 static void IRAM_ATTR isr_handler(void * arg);
@@ -170,7 +170,7 @@ esp_err_t button_init(button_t * const me,
 
     /* Creater FreeRTOS software timer to avoid bounce button */
     me->timer = xTimerCreate("Test timer",
-    		BUTTON_SHORT_TIME,
+    		pdMS_TO_TICKS(BUTTON_SHORT_TIME),
 			pdFALSE,
 			(void *)me,
 			timer_handler); /* todo: implement error handler */
@@ -188,7 +188,7 @@ esp_err_t button_register_cb(button_t * const me,
 	/* Error code variable */
 	esp_err_t ret;
 
-	if(function == NULL || arg == NULL) {
+	if(function == NULL && arg == NULL) {
 		ESP_LOGI(TAG, "Error in function argument");
 		return ESP_ERR_INVALID_ARG;
 	}
@@ -282,7 +282,7 @@ static void IRAM_ATTR isr_handler(void * arg) {
 
 			/* Calculate and print button elapsed time pressed */
 			elapsed_time = pdTICKS_TO_MS(xTaskGetTickCountFromISR() - button->tick_counter);
-//			ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
+			ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
 
 			/* Execute function callback according button elapsed time pressed */
 			if(elapsed_time >= BUTTON_SHORT_TIME && elapsed_time < BUTTON_MEDIUM_TIME) {
@@ -412,3 +412,4 @@ static void timer_handler(TimerHandle_t timer) {
 }
 
 /***************************** END OF FILE ************************************/
+
