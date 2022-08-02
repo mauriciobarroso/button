@@ -3,7 +3,7 @@
 
 ## Features
 - Each button can have three different callback functions depending on the time the button is pressed (short, medium and long)
-- Debounce algorithm is based on FSM (Finite State Machine), FreeRTOS software timers and GPIO interrupts.
+- Debounce algorithm is based on FSM (Finite State Machine), FreeRTOS software timers, FreeRTOS event groups and GPIO interrupts.
 - Multiple instances
 
 ## How to use
