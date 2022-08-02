@@ -16,17 +16,17 @@ Component config-->Button Configuration
 `
 
 2. Include the component header
-```
+```c
 #include "button.h"
 ```
 3. Create one or more instance of the component
-```
+```c
 button_t button1;
 button_t button2; 
 ```
 
 4. Define button callback functions
-```
+```c
 /* Callback function to handle short press of button 1 */
 void button1_short_cb_without_argument(void * arg) {
     printf("Button 1 short press");
@@ -40,7 +40,7 @@ void button2_medium_cb_with_argument(void * arg) {
 ```
 
 5. Initialize the component instances
-```
+```c
 /* Initialize button instances */
 ESP_ERROR_CHECK(button_init(&button, /* button instance */
     GPIO_NUM_0, /* GPIO number */
@@ -54,7 +54,7 @@ ESP_ERROR_CHECK(button_init(&button, /* button instance */
 ```
 
 6. Register the callback functions defined in 3
-```
+```c
  /* Register button1 callback without argument */
 button_register_cb(&button1, SHORT_TIME, button1_cb, NULL);
  
