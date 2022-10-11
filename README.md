@@ -27,13 +27,13 @@ button_t button2;
 
 4. Define button callback functions
 ```c
-/* Callback function to handle short press of button 1 */
-void button1_short_cb_without_argument(void * arg) {
+/* Callback function to handle press of button 1 without argument*/
+void button1_cb(void * arg) {
     printf("Button 1 short press");
 }
 
-/* Callback function to handle medium press of button 2 */
-void button2_medium_cb_with_argument(void * arg) {
+/* Callback function to handle press of button 2 with argument*/
+void button2_cb(void * arg) {
     char * string = (char *)arg;
     printf("%s\n", string);
 }
@@ -42,12 +42,12 @@ void button2_medium_cb_with_argument(void * arg) {
 5. Initialize the component instances
 ```c
 /* Initialize button instances */
-ESP_ERROR_CHECK(button_init(&button, /* button instance */
+ESP_ERROR_CHECK(button_init(&button1, /* button 1 instance */
     GPIO_NUM_0, /* GPIO number */
     tskIDLE_PRIORITY + 10, /* button FreeRTOS task priority */
     configMINIMAL_STACK_SIZE * 4)); /* button FreeRTOS task stack size */
 
-ESP_ERROR_CHECK(button_init(&button, /* button instance */
+ESP_ERROR_CHECK(button_init(&button2, /* button 2 instance */
     GPIO_NUM_21, /* GPIO number */
     tskIDLE_PRIORITY + 11, /* button FreeRTOS task priority */
     configMINIMAL_STACK_SIZE * 4)); /* button FreeRTOS task stack size */
@@ -55,10 +55,10 @@ ESP_ERROR_CHECK(button_init(&button, /* button instance */
 
 6. Register the callback functions defined in 3
 ```c
- /* Register button1 callback without argument */
+ /* Register button1 callback for short press without argument */
 button_register_cb(&button1, SHORT_TIME, button1_cb, NULL);
  
- /* Register button2 callbacks for medium and long press time with different arguments */
+ /* Register button2 callbacks for medium and long press with different arguments */
 button_register_cb(&button2, MEDIUM_TIME, button2_cb, "Button 2 medium press");
 button_register_cb(&button2, LONG_TIME, button2_cb, "Button 2 long press");
 ```
