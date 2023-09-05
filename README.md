@@ -2,9 +2,9 @@
 # ESP-IDF Button Component
 
 ## Features
-- Each button can have three different callback functions depending on the time the button is pressed (short, medium and long)
+- Each button can have up to four different callback functions depending on the way the button is pressed (single, medium, long and double).
 - Debounce algorithm is based on FSM (Finite State Machine), FreeRTOS software timers, FreeRTOS event groups and GPIO interrupts.
-- Multiple instances
+- Multiple instances.
 
 ## How to use
 To use this component follow the next steps:
@@ -28,39 +28,38 @@ button_t button2;
 4. Define button callback functions
 ```c
 /* Callback function to handle press of button 1 without argument*/
-void button1_cb(void * arg) {
-    printf("Button 1 short press");
+void button1_cb(void *arg) {
+    printf("Button 1 single click");
 }
 
 /* Callback function to handle press of button 2 with argument*/
-void button2_cb(void * arg) {
-    char * string = (char *)arg;
-    printf("%s\n", string);
+void button2_cb(void *arg) {
+    printf("%s\n", (char *)arg);
 }
 ```
 
 5. Initialize the component instances
 ```c
 /* Initialize button instances */
-ESP_ERROR_CHECK(button_init(&button1, /* button 1 instance */
-    GPIO_NUM_0, /* GPIO number */
-    tskIDLE_PRIORITY + 10, /* button FreeRTOS task priority */
-    configMINIMAL_STACK_SIZE * 4)); /* button FreeRTOS task stack size */
+ESP_ERROR_CHECK(button_init(&button1, /* Button instance */
+    GPIO_NUM_0,                       /* Button GPIO number */
+    tskIDLE_PRIORITY + 10,            /* Button FreeRTOS task priority */
+    configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
 
-ESP_ERROR_CHECK(button_init(&button2, /* button 2 instance */
-    GPIO_NUM_21, /* GPIO number */
-    tskIDLE_PRIORITY + 11, /* button FreeRTOS task priority */
-    configMINIMAL_STACK_SIZE * 4)); /* button FreeRTOS task stack size */
+ESP_ERROR_CHECK(button_init(&button2, /* Button instance */
+    GPIO_NUM_21,                      /* Button GPIO number */
+    tskIDLE_PRIORITY + 11,            /* Button FreeRTOS task priority */
+    configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
 ```
 
-6. Register the callback functions defined in 3
+6. Add the callback functions defined in 3
 ```c
- /* Register button1 callback for short press without argument */
-button_register_cb(&button1, SHORT_TIME, button1_cb, NULL);
+ /* Register button1 callback for single click without argument */
+button_add_cb(&button1, BUTTON_CLICK_SINGLE, button1_cb, NULL);
  
- /* Register button2 callbacks for medium and long press with different arguments */
-button_register_cb(&button2, MEDIUM_TIME, button2_cb, "Button 2 medium press");
-button_register_cb(&button2, LONG_TIME, button2_cb, "Button 2 long press");
+ /* Register button2 callbacks for medium and double click with different arguments */
+button_add_cb(&button2, BUTTON_CLICK_MEDIUM, button2_cb, "Button 2 medium click");
+button_add_cb(&button2, BUTTON_CLICK_DOUBLE, button2_cb, "Button 2 double click");
 ```
 
 ## License
