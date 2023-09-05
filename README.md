@@ -2,8 +2,9 @@
 # ESP-IDF Button Component
 
 ## Features
-- Each button can have up to four different callback functions depending on the way the button is pressed (single, medium, long and double).
+- Each button support up to four different callback functions depending on the way the button is pressed (single, medium, long and double).
 - Debounce algorithm is based on FSM (Finite State Machine), FreeRTOS software timers, FreeRTOS event groups and GPIO interrupts.
+- Support pull-up and pull-down button configurations.
 - Multiple instances.
 
 ## How to use
