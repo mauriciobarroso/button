@@ -57,41 +57,41 @@ typedef void (* button_cb_t)(void *);
 /**/
 typedef struct {
 	button_cb_t function;
-	void * arg;
+	void *arg;
 } button_function_t;
 
 typedef enum {
-	FALLING_MODE = 0,
-	RISING_MODE
-} button_mode_e;
+	BUTTON_EDGE_FALLING = 0,
+	BUTTON_EDGE_RISING
+} button_edge_e;
 
 /* Button states */
 typedef enum {
-	DOWN_STATE = 0,
-	UP_STATE,
-//	FALLING_STATE,
-//	RISING_STATE
+	BUTTON_STATE_DOWN = 0,
+	BUTTON_STATE_UP,
 } button_state_e;
 
 /**/
 typedef enum {
-	SHORT_TIME  = 0,
-	MEDIUM_TIME,
-	LONG_TIME
-} button_time_e;
+	BUTTON_CLICK_SINGLE = 0,
+	BUTTON_CLICK_MEDIUM,
+	BUTTON_CLICK_LONG,
+	BUTTON_CLICK_DOUBLE,
+	BUTTON_CLICK_MAX
+} button_click_e;
 
 typedef struct {
-	button_state_e state;				/*!< Button state */
-	button_mode_e mode;					/*!< Button mode activation */
-	gpio_num_t gpio;					/*!< Button GPIO number */
-	TickType_t tick_counter;			/*!< Tick counter */
-	button_function_t short_function;	/*!< Short press callback function structure */
-	button_function_t medium_function;	/*!< Medium press callback function structure */
-	button_function_t long_function;	/*!< Long press callback function structure */
-	EventGroupHandle_t event_group;		/*!< Button FreeRTOS event group */
-	UBaseType_t task_priority;			/*!< Button FreeRTOS task priority */
-	uint32_t task_stack_size;			/*!< Button FreeRTOS task stack size */
-	TimerHandle_t timer;
+	button_state_e state;											/*!< Button state */
+	button_edge_e edge;												/*!< Button interrupt type */
+	gpio_num_t gpio;													/*!< Button GPIO number */
+	TickType_t tick_counter;									/*!< Tick counter */
+	button_function_t function[BUTTON_CLICK_MAX];
+	EventGroupHandle_t event_group;						/*!< Button FreeRTOS event group */
+	UBaseType_t task_priority;								/*!< Button FreeRTOS task priority */
+	uint32_t task_stack_size;									/*!< Button FreeRTOS task stack size */
+	TimerHandle_t debounce_timer;							/*!< Button FreeRTOS debounce timer */
+	TimerHandle_t click_timer;								/*!< Button FreeRTOS double click timer */
+	uint8_t click_counter;										/*!< Button FreeRTOS double click timer */
 } button_t;
 
 /* Exported constants --------------------------------------------------------*/
@@ -102,50 +102,47 @@ typedef struct {
 /**
   * @brief Initialize a button instance
   *
-  * @param me Pointer to button_t structure
-  * @param gpio GPIO number to attach button
-  * @param task_priority Button task priority
-  * @param task_stack_size Button task stack size
+  * @param me              : Pointer to button_t structure
+  * @param gpio            : GPIO number to attach button
+  * @param edge            : GPIO interrupt edge
+  * @param task_priority   : Button task priority
+  * @param task_stack_size : Button task stack size
   *
   * @retval
   * 	- ESP_OK on success
   * 	- ESP_ERR_INVALID_ARG if the argument is invalid
   */
-esp_err_t button_init(button_t * const me,
-		gpio_num_t gpio,
-		UBaseType_t task_priority,
-		uint32_t task_stack_size);
+esp_err_t button_init(button_t *const me, gpio_num_t gpio, button_edge_e edge,
+		UBaseType_t task_priority, uint32_t task_stack_size);
 
 /**
-  * @brief Register a button callback function
+  * @brief Add a button callback function
   *
-  * @param me Pointer to button_t structure
-  * @param time Button press time to register callback function
-  * @param function Callback function code
-  * @param arg Pointer to callback function argument
+  * @param me         : Pointer to button_t structure
+  * @param click_type : Button press time to register callback function
+  * @param function   : Callback function code
+  * @param arg        : Pointer to callback function argument
   *
   * @retval
   * 	- ESP_OK on success
   * 	- ESP_NO_MEM if is out of memory
   * 	- ESP_ERR_INVALID_ARG if the argument is invalid
   */
-esp_err_t button_register_cb(button_t * const me,
-		button_time_e time,
-		button_cb_t function,
-		void * arg);
+esp_err_t button_add_cb(button_t *const me,	button_click_e click_type,
+		button_cb_t function, void * arg);
 
 /**
-  * @brief Unregister a button callback function
+  * @brief Remove a button callback function
   *
-  * @param me Pointer to button_t structure
-  * @param time Button press time to unregister callback function
+  * @param me         : Pointer to button_t structure
+  * @param click_type : Button press time to unregister callback function
   *
   *
   * @retval
   * 	- ESP_OK on success
   * 	- ESP_ERR_INVALID_ARG if the argument is invalid
   */
-esp_err_t button_unregister_cb(button_t * const me, button_time_e time);
+esp_err_t button_remove_cb(button_t *const me, button_click_e click_type);
 
 #ifdef __cplusplus
 }

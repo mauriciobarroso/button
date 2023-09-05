@@ -43,56 +43,48 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* Button event bits */
-#define BUTTON_SHORT_PRESS_BIT	BIT0
-#define BUTTON_MEDIUM_PRESS_BIT	BIT1
-#define BUTTON_LONG_PRESS_BIT	BIT2
+#define BUTTON_SHORT_PRESS_BIT				BIT0
+#define BUTTON_MEDIUM_PRESS_BIT				BIT1
+#define BUTTON_LONG_PRESS_BIT					BIT2
+#define BUTTON_DOUBLE_CLICK_PRESS_BIT	BIT3
 
-/* Button  */
-#define BUTTON_SHORT_TIME	CONFIG_BUTTON_DEBOUNCE_SHORT_TIME
-#define BUTTON_MEDIUM_TIME	CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME
-#define BUTTON_LONG_TIME	CONFIG_BUTTON_DEBOUNCE_LONG_TIME
+#define ENABLE_LOG
 
 /* Private function prototypes -----------------------------------------------*/
 static void IRAM_ATTR isr_handler(void * arg);
 static void button_task (void * arg);
 
-static void timer_handler(TimerHandle_t timer);
+static void debounce_timer_handler(TimerHandle_t timer);
+static void click_timer_handler(TimerHandle_t timer);
 
 /* Private variables ---------------------------------------------------------*/
 /* Tag for debug */
 static const char * TAG = "button";
 
 /* Exported functions --------------------------------------------------------*/
-esp_err_t button_init(button_t * const me,
-		gpio_num_t gpio,
-		UBaseType_t task_priority,
-		uint32_t task_stack_size) {
+esp_err_t button_init(button_t *const me, gpio_num_t gpio, button_edge_e edge,
+		UBaseType_t task_priority, uint32_t task_stack_size) {
 	ESP_LOGI(TAG, "Initializing button component...");
 
 	/* Error code variable */
-	esp_err_t ret;
+	esp_err_t ret = ESP_OK;
 
 	/* Initialize callback variables */
-	me->short_function.function = NULL;
-	me->short_function.arg = NULL;
-	me->medium_function.function = NULL;
-	me->medium_function.arg = NULL;
-	me->long_function.function = NULL;
-	me->long_function.arg = NULL;
+	for (uint8_t i = 0; i < BUTTON_CLICK_MAX; i++) {
+		me->function[i].function = NULL;
+	}
 
 	/* Create button event group */
 	me->event_group = xEventGroupCreate();
 
-	if(me->event_group == NULL) {
-		ESP_LOGE(TAG, "Error allocating memory to create event group");
-
+	if (me->event_group == NULL) {
+		ESP_LOGE(TAG, "Failed to allocate memory to create event group");
 		return ESP_ERR_NO_MEM;
 	}
 
 	/* Initialize button GPIO */
-	if(gpio < GPIO_NUM_0 || gpio >= GPIO_NUM_MAX) {
-		ESP_LOGE(TAG, "Error in gpio number argument");
-
+	if (gpio < GPIO_NUM_0 || gpio >= GPIO_NUM_MAX) {
+		ESP_LOGE(TAG, "Invalid GPIO number");
 		return ESP_ERR_INVALID_ARG;
 	}
 
@@ -102,50 +94,44 @@ esp_err_t button_init(button_t * const me,
 	gpio_conf.pin_bit_mask = 1ULL << me->gpio;
 	gpio_conf.mode = GPIO_MODE_INPUT;
 
-//	if(mode != FALLING_MODE && mode != RISING_MODE) {
-//		ESP_LOGE(TAG, "Error in mode argument");
-//
-//		return ESP_ERR_INVALID_ARG;
-//	}
+	me->edge = edge;
 
-	me->mode = FALLING_MODE;
-
-	if(me->mode == FALLING_MODE) {
+	if (me->edge == BUTTON_EDGE_FALLING) {
 		gpio_conf.pull_up_en = GPIO_PULLUP_ENABLE;
 		gpio_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-		me->state = DOWN_STATE;
+		me->state = BUTTON_STATE_DOWN;
 		gpio_conf.intr_type = GPIO_INTR_NEGEDGE;
 	}
-//	else {
-//		gpio_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-//		gpio_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
-//		me->state = UP_STATE;
-//		gpio_conf.intr_type = GPIO_INTR_POSEDGE;
-//	}
+	else if (me->edge == BUTTON_EDGE_RISING) {
+		gpio_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+		gpio_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
+		me->state = BUTTON_STATE_UP;
+		gpio_conf.intr_type = GPIO_INTR_POSEDGE;
+	}
+	else {
+		ESP_LOGE(TAG, "Invalid mode");
+		return ESP_ERR_INVALID_ARG;
+	}
 
-//	gpio_conf.intr_type = GPIO_INTR_ANYEDGE;
 	ret = gpio_config(&gpio_conf);
 
-	if(ret != ESP_OK) {
-		ESP_LOGE(TAG, "Error configuring GPIO");
-
+	if (ret != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to configure GPIO");
 		return ret;
 	}
 
 	/* Install ISR service and add ISR handler */
 	ret = gpio_install_isr_service(0);
 
-	if(ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-		ESP_LOGE(TAG, "Error configuring GPIO ISR service");
-
+	if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+		ESP_LOGE(TAG, "Failed to install GPIO ISR service");
 		return ret;
 	}
 
 	ret = gpio_isr_handler_add(me->gpio, isr_handler, (void *)me);
 
-	if(ret != ESP_OK) {
-		ESP_LOGE(TAG, "Error adding GPIO ISR handler");
-
+	if (ret != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to add GPIO ISR handler");
 		return ret;
 	}
 
@@ -157,172 +143,212 @@ esp_err_t button_init(button_t * const me,
 	me->task_stack_size = task_stack_size;
 
 	/* Create RTOS task */
-    if(xTaskCreate(button_task,
-    		"Button Task",
+	if (xTaskCreate(button_task,
+			"Button Task",
 			me->task_stack_size,
 			(void *)me,
 			me->task_priority,
 			NULL) != pdPASS) {
-    	ESP_LOGE(TAG, "Error allocating memory to create task");
 
-    	return ESP_ERR_NO_MEM;
-    }
+		ESP_LOGE(TAG, "Failed to allocate memory to create task");
+		return ESP_ERR_NO_MEM;
+	}
 
-    /* Creater FreeRTOS software timer to avoid bounce button */
-    me->timer = xTimerCreate("Test timer",
-    		pdMS_TO_TICKS(BUTTON_SHORT_TIME),
+	/* Creater FreeRTOS software timer to filter button bounce */
+	me->debounce_timer = xTimerCreate("Debounce timer",
+			pdMS_TO_TICKS(CONFIG_BUTTON_DEBOUNCE_SHORT_TIME),
 			pdFALSE,
 			(void *)me,
-			timer_handler); /* todo: implement error handler */
+			debounce_timer_handler);
 
-	/* Return error code */
+	if (me->debounce_timer == NULL) {
+		ESP_LOGE(TAG, "Failed to allocate memory to timer");
+		return ESP_ERR_NO_MEM;
+	}
+
+	/* Creater FreeRTOS software timer to count the clicks number */
+	me->click_timer = xTimerCreate("Click timer",
+			pdMS_TO_TICKS(CONFIG_BUTTON_DEBOUNCE_SHORT_TIME * 8),
+			pdFALSE,
+			(void *)me,
+			click_timer_handler);
+
+	if (me->click_timer == NULL) {
+		ESP_LOGE(TAG, "Failed to allocate memory to timer");
+		return ESP_ERR_NO_MEM;
+	}
+
+	/* Return ESP_OK */
 	return ret;
 }
 
-esp_err_t button_register_cb(button_t * const me,
-		button_time_e time,
-		button_cb_t function,
-		void * arg) {
-	ESP_LOGI(TAG, "Registering a callback for button...");
+esp_err_t button_add_cb(button_t *const me, button_click_e click_type,
+		button_cb_t function, void *arg) {
+	ESP_LOGI(TAG, "Adding callback for button...");
 
 	/* Error code variable */
-	esp_err_t ret;
+	esp_err_t ret = ESP_OK;
 
-	if(function == NULL && arg == NULL) {
-		ESP_LOGI(TAG, "Error in function argument");
+	/* Check function argument */
+	if (function == NULL) {
+		ESP_LOGI(TAG, "Invalid function argument");
 		return ESP_ERR_INVALID_ARG;
 	}
 
-	/* Select callback by time */
-	switch(time) {
-		case SHORT_TIME:
-			me->short_function.function = function;
-			me->short_function.arg = arg;
-
-			break;
-
-		case MEDIUM_TIME:
-			me->medium_function.function = function;
-			me->medium_function.arg = arg;
-
-			break;
-
-		case LONG_TIME:
-			me->long_function.function = function;
-			me->long_function.arg = arg;
-
-			break;
-
-		default:
-			ESP_LOGI(TAG, "Invalid time value");
-			ret = ESP_ERR_INVALID_ARG;
-			break;
+	if (click_type < BUTTON_CLICK_SINGLE || click_type >= BUTTON_CLICK_MAX) {
+		ESP_LOGI(TAG, "Invalid mode");
+		ret = ESP_ERR_INVALID_ARG;
 	}
 
-	/* Return error code */
+	/* Assign function and argument values */
+	me->function[click_type].function = function;
+	me->function[click_type].arg = arg;
+
+	/* Return ESP_OK */
 	return ret;
 }
 
-esp_err_t button_unregister_cb(button_t * const me, button_time_e time) {
-	ESP_LOGI(TAG, "Initializing button component...");
+esp_err_t button_remove_cb(button_t *const me, button_click_e click_type) {
+	ESP_LOGI(TAG, "Removing button callback function...");
 
 	/* Error code variable */
-	esp_err_t ret;
+	esp_err_t ret = ESP_OK;
 
-	/* Select callback by time and clear button callback function and argument*/
-	switch(time) {
-		case SHORT_TIME:
-			me->short_function.function = NULL;
-			me->short_function.arg = NULL;
-
-			break;
-
-		case MEDIUM_TIME:
-			me->medium_function.function = NULL;
-			me->medium_function.arg = NULL;
-
-			break;
-
-		case LONG_TIME:
-			me->long_function.function = NULL;
-			me->long_function.arg = NULL;
-
-			break;
-
-		default:
-			ESP_LOGI(TAG, "Error in arg argument");
-			ret = ESP_ERR_INVALID_ARG;
-			break;
+	if (click_type < BUTTON_CLICK_SINGLE || click_type >= BUTTON_CLICK_MAX) {
+		ESP_LOGI(TAG, "Invalid mode");
+		ret = ESP_ERR_INVALID_ARG;
 	}
 
-	/* Return error code */
+	/* Assign function and argument values */
+	me->function[click_type].function = NULL;
+	me->function[click_type].arg = NULL;
+
+	/* Return ESP_OK */
 	return ret;
 }
 /* Private functions ---------------------------------------------------------*/
-static void IRAM_ATTR isr_handler(void * arg) {
-	button_t * button = (button_t *)arg;
+static void IRAM_ATTR isr_handler(void *arg) {
+	button_t *button = (button_t *)arg;
 
 	static TickType_t elapsed_time = 0;
 
-	switch(button->state) {
-		case DOWN_STATE:
+	switch (button->state) {
+		case BUTTON_STATE_DOWN:
 			/* Disable button interrupt */
 			gpio_set_intr_type(button->gpio, GPIO_INTR_DISABLE);
 
-			/* Get initial tick counter */
-			button->tick_counter = xTaskGetTickCountFromISR();
-
-			/* Start debounce timer */
-			xTimerStartFromISR(button->timer, NULL);
-
-			break;
-		case UP_STATE:
-			/* Disable button interrupt */
-			gpio_set_intr_type(button->gpio, GPIO_INTR_DISABLE);
-
-			/* Calculate and print button elapsed time pressed */
-			elapsed_time = pdTICKS_TO_MS(xTaskGetTickCountFromISR() - button->tick_counter);
-			ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
-
-			/* Execute function callback according button elapsed time pressed */
-			if(elapsed_time >= BUTTON_SHORT_TIME && elapsed_time < BUTTON_MEDIUM_TIME) {
-				xEventGroupSetBitsFromISR(button->event_group, BUTTON_SHORT_PRESS_BIT, NULL);
-			}
-			else if((elapsed_time >= BUTTON_MEDIUM_TIME && elapsed_time < BUTTON_LONG_TIME)) {
-				xEventGroupSetBitsFromISR(button->event_group, BUTTON_MEDIUM_PRESS_BIT, NULL);
-			}
-			else if(elapsed_time >= BUTTON_LONG_TIME) {
-				xEventGroupSetBitsFromISR(button->event_group, BUTTON_LONG_PRESS_BIT, NULL);
+			if (button->edge == BUTTON_EDGE_FALLING) {
+				/* Get initial tick counter */
+				button->tick_counter = xTaskGetTickCountFromISR();
 			}
 			else {
-//				ESP_DRAM_LOGI(TAG, "button %d bounce", button->gpio);
-				break;
+				/* Calculate and print button elapsed time pressed */
+				elapsed_time = pdTICKS_TO_MS(xTaskGetTickCountFromISR() - button->tick_counter);
+#ifdef ENABLE_LOG
+				ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
+#endif
+
+				/* Execute function callback according button elapsed time pressed */
+				if (elapsed_time >= CONFIG_BUTTON_DEBOUNCE_SHORT_TIME && elapsed_time < CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME) {
+					/* Increment click counter */
+					button->click_counter++;
+
+					if (button->click_counter == 2) {
+						button->click_counter = 0;
+						xEventGroupSetBitsFromISR(button->event_group, BUTTON_DOUBLE_CLICK_PRESS_BIT, NULL);
+					}
+
+					/* Start click timer */
+					xTimerStartFromISR(button->click_timer, NULL);
+				}
+				else if ((elapsed_time >= CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME && elapsed_time < CONFIG_BUTTON_DEBOUNCE_LONG_TIME)) {
+					xEventGroupSetBitsFromISR(button->event_group, BUTTON_MEDIUM_PRESS_BIT, NULL);
+				}
+				else if (elapsed_time >= CONFIG_BUTTON_DEBOUNCE_LONG_TIME) {
+					xEventGroupSetBitsFromISR(button->event_group, BUTTON_LONG_PRESS_BIT, NULL);
+				}
+				else {
+#ifdef ENABLE_LOG
+					ESP_DRAM_LOGI(TAG, "button %d bounce", button->gpio);
+#endif
+					break;
+				}
+
+				/* Reset button elapsed time pressed */
+				elapsed_time = 0;
 			}
 
-			/* Reset button elapsed time pressed */
-			elapsed_time = 0;
+			/* Start debounce timer */
+			xTimerStartFromISR(button->debounce_timer, NULL);
+
+			break;
+
+		case BUTTON_STATE_UP:
+			/* Disable button interrupt */
+			gpio_set_intr_type(button->gpio, GPIO_INTR_DISABLE);
+
+			if (button->edge == BUTTON_EDGE_FALLING) {
+				/* Calculate and print button elapsed time pressed */
+				elapsed_time = pdTICKS_TO_MS(xTaskGetTickCountFromISR() - button->tick_counter);
+#ifdef ENABLE_LOG
+				ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
+#endif
+
+				/* Execute function callback according button elapsed time pressed */
+				if (elapsed_time >= CONFIG_BUTTON_DEBOUNCE_SHORT_TIME && elapsed_time < CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME) {
+					/* Increment click counter */
+					button->click_counter++;
+
+					if (button->click_counter == 2) {
+						button->click_counter = 0;
+						xEventGroupSetBitsFromISR(button->event_group, BUTTON_DOUBLE_CLICK_PRESS_BIT, NULL);
+					}
+
+					/* Start click timer */
+					xTimerStartFromISR(button->click_timer, NULL);
+				}
+				else if ((elapsed_time >= CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME && elapsed_time < CONFIG_BUTTON_DEBOUNCE_LONG_TIME)) {
+					xEventGroupSetBitsFromISR(button->event_group, BUTTON_MEDIUM_PRESS_BIT, NULL);
+				}
+				else if (elapsed_time >= CONFIG_BUTTON_DEBOUNCE_LONG_TIME) {
+					xEventGroupSetBitsFromISR(button->event_group, BUTTON_LONG_PRESS_BIT, NULL);
+				}
+				else {
+#ifdef ENABLE_LOG
+					ESP_DRAM_LOGI(TAG, "button %d bounce", button->gpio);
+#endif
+					break;
+				}
+
+				/* Reset button elapsed time pressed */
+				elapsed_time = 0;
+			}
+			else {
+				/* Get initial tick counter */
+				button->tick_counter = xTaskGetTickCountFromISR();
+			}
 
 			/* Start debounce timer */
-			xTimerStartFromISR(button->timer, NULL);
+			xTimerStartFromISR(button->debounce_timer, NULL);
 
 			break;
 
 		default:
-//			ESP_DRAM_LOGI(TAG, "button error");
 			break;
 	}
 
 	portYIELD_FROM_ISR();
 }
 
-static void button_task (void * arg) {
-	button_t * button = (button_t *)arg;
+static void button_task(void *arg) {
+	button_t *button = (button_t *)arg;
 	EventBits_t bits;
 	const EventBits_t bits_wait_for = (BUTTON_SHORT_PRESS_BIT |
 			BUTTON_MEDIUM_PRESS_BIT |
-			BUTTON_LONG_PRESS_BIT);
+			BUTTON_LONG_PRESS_BIT |
+			BUTTON_DOUBLE_CLICK_PRESS_BIT);
 
-	for(;;) {
+	for (;;) {
 		/* Wait until some bit is set */
 		bits = xEventGroupWaitBits(button->event_group,
 				bits_wait_for,
@@ -330,42 +356,49 @@ static void button_task (void * arg) {
 				pdFALSE,
 				portMAX_DELAY);
 
-		if(bits & BUTTON_SHORT_PRESS_BIT) {
+		if (bits & BUTTON_SHORT_PRESS_BIT) {
 			ESP_LOGI(TAG, "BUTTON_SHORT_PRESS_BIT set");
-//			ESP_LOGI(TAG, "Button %d", button->gpio);
 
 			/* Execute callback function */
-			if(button->short_function.function != NULL) {
-				button->short_function.function(button->short_function.arg);
+			if (button->function[BUTTON_CLICK_SINGLE].function != NULL) {
+				button->function[BUTTON_CLICK_SINGLE].function(button->function[BUTTON_CLICK_SINGLE].arg);
 			}
 			else {
-				ESP_LOGW(TAG, "Not defined callback function");
+				ESP_LOGW(TAG, "Function callback not added");
 			}
 		}
 
-		else if(bits & BUTTON_MEDIUM_PRESS_BIT) {
+		else if (bits & BUTTON_MEDIUM_PRESS_BIT) {
 			ESP_LOGI(TAG, "BUTTON_MEDIUM_PRESS_BIT set");
-//			ESP_LOGI(TAG, "Button %d", button->gpio);
 
 			/* Execute callback function */
-			/* Execute callback function */
-			if(button->medium_function.function != NULL) {
-				button->medium_function.function(button->medium_function.arg);
+			if (button->function[BUTTON_CLICK_MEDIUM].function != NULL) {
+				button->function[BUTTON_CLICK_MEDIUM].function(button->function[BUTTON_CLICK_MEDIUM].arg);
 			}
 			else {
-				ESP_LOGW(TAG, "Not defined callback function");
+				ESP_LOGW(TAG, "Function callback not added");
 			}
 		}
-		else if(bits & BUTTON_LONG_PRESS_BIT) {
+		else if (bits & BUTTON_LONG_PRESS_BIT) {
 			ESP_LOGI(TAG, "BUTTON_LONG_PRESS_BIT set");
-//			ESP_LOGI(TAG, "Button %d", button->gpio);
 
 			/* Execute callback function */
-			if(button->long_function.function != NULL) {
-				button->long_function.function(button->long_function.arg);
+			if (button->function[BUTTON_CLICK_LONG].function != NULL) {
+				button->function[BUTTON_CLICK_LONG].function(button->function[BUTTON_CLICK_LONG].arg);
 			}
 			else {
-				ESP_LOGW(TAG, "Not defined callback function");
+				ESP_LOGW(TAG, "Function callback not added");
+			}
+		}
+		else if (bits & BUTTON_DOUBLE_CLICK_PRESS_BIT) {
+			ESP_LOGI(TAG, "BUTTON_DOUBLE_CLICK_PRESS_BIT set");
+
+			/* Execute callback function */
+			if (button->function[BUTTON_CLICK_DOUBLE].function != NULL) {
+				button->function[BUTTON_CLICK_DOUBLE].function(button->function[BUTTON_CLICK_DOUBLE].arg);
+			}
+			else {
+				ESP_LOGW(TAG, "Function callback not added");
 			}
 		}
 		else {
@@ -374,40 +407,79 @@ static void button_task (void * arg) {
 	}
 }
 
-static void timer_handler(TimerHandle_t timer) {
+static void debounce_timer_handler(TimerHandle_t timer) {
+	/* Get instance data */
+	button_t *button = (button_t *)pvTimerGetTimerID(timer);
 
-	button_t * button = (button_t *)pvTimerGetTimerID(timer);
+	/*  */
+	if (button->edge == BUTTON_EDGE_FALLING) {
+		if (button->state == BUTTON_STATE_DOWN) {
+			if (!gpio_get_level(button->gpio)) {
+				/* Change to next state */
+				button->state = BUTTON_STATE_UP;
 
-//	ESP_DRAM_LOGI(TAG, "Button: %d, state %s", button->gpio, button->state? "UP_STATE": "DOWN_STATE");
+				/* Enable button interrupt to detect positive edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_POSEDGE);
+			}
+			else {
+				/* Enable button interrupt to detect negative edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_NEGEDGE);
+			}
 
-	if(button->state == DOWN_STATE) {
-		if(!gpio_get_level(button->gpio)) {
-			/* Change to next state */
-			button->state = UP_STATE;
-
-			/* Enable button interrupt to detect positive edge */
-			gpio_set_intr_type(button->gpio, GPIO_INTR_POSEDGE);
 		}
 		else {
-//			ESP_DRAM_LOGI(TAG, "POSEDGE very fast");
-			/* Enable button interrupt to detect negative edge */
-			gpio_set_intr_type(button->gpio, GPIO_INTR_NEGEDGE);
-		}
+			if (gpio_get_level(button->gpio)) {
+				/* Change to next state */
+				button->state = BUTTON_STATE_DOWN;
 
+				/* Enable button interrupt to detect negative edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_NEGEDGE);
+			}
+			else {
+				/* Enable button interrupt to detect positive edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_POSEDGE);
+			}
+		}
 	}
 	else {
-		if(gpio_get_level(button->gpio)) {
-			/* Change to next state */
-			button->state = DOWN_STATE;
+		if (button->state == BUTTON_STATE_UP) {
+			if (gpio_get_level(button->gpio)) {
+				/* Change to next state */
+				button->state = BUTTON_STATE_DOWN;
 
-			/* Enable button interrupt to detect negative edge */
-			gpio_set_intr_type(button->gpio, GPIO_INTR_NEGEDGE);
+				/* Enable button interrupt to detect positive edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_NEGEDGE);
+			}
+			else {
+				/* Enable button interrupt to detect negative edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_POSEDGE);
+			}
+
 		}
 		else {
-			/* Enable button interrupt to detect positive edge */
-			gpio_set_intr_type(button->gpio, GPIO_INTR_POSEDGE);
-//			ESP_DRAM_LOGI(TAG, "NEGEDGE very fast");
+			if (!gpio_get_level(button->gpio)) {
+				/* Change to next state */
+				button->state = BUTTON_STATE_UP;
+
+				/* Enable button interrupt to detect negative edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_POSEDGE);
+			}
+			else {
+				/* Enable button interrupt to detect positive edge */
+				gpio_set_intr_type(button->gpio, GPIO_INTR_NEGEDGE);
+			}
 		}
+	}
+}
+
+static void click_timer_handler(TimerHandle_t timer) {
+	/* Get instance data */
+	button_t *button = (button_t *)pvTimerGetTimerID(timer);
+
+	/* Single click */
+	if (button->click_counter == 1) {
+		button->click_counter = 0;
+		xEventGroupSetBitsFromISR(button->event_group, BUTTON_SHORT_PRESS_BIT, NULL);
 	}
 }
 
