@@ -1,5 +1,6 @@
 
 # ESP-IDF Button Component
+ESP-IDF component to configure and use several tactile switches 
 
 ## Features
 - Each button support up to four different callback functions depending on the way the button is pressed (single, medium, long and double).
@@ -7,7 +8,7 @@
 - Support pull-up and pull-down button configurations.
 - Multiple instances.
 
-# How to use
+## How to use
 To use this component follow the next steps:
 
 1. Configure the component in the project configuration menu (`idf.py menuconfig`)
