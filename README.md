@@ -7,72 +7,60 @@
 - Support pull-up and pull-down button configurations.
 - Multiple instances.
 
-## How to use
+# How to use
 To use this component follow the next steps:
 
-1. Include the I2C driver and component headers
+1. Configure the component in the project configuration menu (`idf.py menuconfig`)
+
+`
+Component config-->Button Configuration
+`
+
+2. Include the component header
 ```c
-#include "driver/i2c_master.h"
-#include "sgia.h"
+#include "button.h"
 ```
-2. Declare a handle of I2C bus and an instance of SGIA
+3. Create one or more instance of the component
 ```c
-i2c_master_bus_handle_t i2c_bus_handle; 
-sgia_t button1;
+button_t button1;
+button_t button2; 
 ```
 
-3. Define a RTOS task to run SGIA process
+4. Define button callback functions
 ```c
-void sgia_process_task(void *arg) {
-    int32_t voc_index, nox_index;
-    float temp, hum;
-    
-    for (;;) {
-        /* Run SGIA process */
-        ESP_ERROR_CHECK(sgia_run(&sgia));
+/* Callback function to handle press of button 1 without argument*/
+void button1_cb(void *arg) {
+    printf("Button 1 single click");
+}
 
-        /* Get and print VOC and NOx indices */
-        sgia_get_index_voc_and_nox(&sgia, &voc_index, &nox_index);
-        printf("VOC index: %ld\tNOx index: %ld\r\n", sgia.voc_index, sgia.nox_index);
-
-        /* Get and print temperature and humidity values */
-        sgia_get_temp_and_hum(&sgia, &temp, &hum);
-        printf("Temperature: %f\tHumidity: %f\r\n\n", sgia.temp, sgia.hum);
-    
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
+/* Callback function to handle press of button 2 with argument*/
+void button2_cb(void *arg) {
+    printf("%s\n", (char *)arg);
 }
 ```
 
-4. Configure and create a new I2C bus
+5. Initialize the component instances
 ```c
-/* Configure and create a new I2C bus */
-i2c_master_bus_config_t i2c_bus_config = {
-    .clk_source = I2C_CLK_SRC_DEFAULT,
-    .i2c_port = I2C_NUM_0,
-    .scl_io_num = GPIO_NUM_48,
-    .sda_io_num = GPIO_NUM_47,
-    .glitch_ignore_cnt = 7
-};
+/* Initialize button instances */
+ESP_ERROR_CHECK(button_init(&button1, /* Button instance */
+    GPIO_NUM_0,                       /* Button GPIO number */
+    tskIDLE_PRIORITY + 10,            /* Button FreeRTOS task priority */
+    configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
 
-ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &i2c_bus_handle));
+ESP_ERROR_CHECK(button_init(&button2, /* Button instance */
+    GPIO_NUM_21,                      /* Button GPIO number */
+    tskIDLE_PRIORITY + 11,            /* Button FreeRTOS task priority */
+    configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
 ```
 
-5. Initialize SGIA instance
+6. Add the callback functions defined in 3
 ```c
-/* Initialize SGIA instance */
-sgia_init(&sgia, i2c_bus_handle);
-```
-
-6. Create the RTOS task defined in 3
-```c
-xTaskCreate(
-    sgia_process_task, /* Task code */
-    "BSEC Task", /* Task name */
-    configMINIMAL_STACK_SIZE * 4, /* Task stack depth */
-    NULL, /* Task parameter */
-    tskIDLE_PRIORITY + 2, /* Task priority */
-    NULL); /* Task handle */
+ /* Register button1 callback for single click without argument */
+button_add_cb(&button1, BUTTON_CLICK_SINGLE, button1_cb, NULL);
+ 
+ /* Register button2 callbacks for medium and double click with different arguments */
+button_add_cb(&button2, BUTTON_CLICK_MEDIUM, button2_cb, "Button 2 medium click");
+button_add_cb(&button2, BUTTON_CLICK_DOUBLE, button2_cb, "Button 2 double click");
 ```
 
 ## License
