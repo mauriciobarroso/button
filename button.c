@@ -48,8 +48,6 @@
 #define BUTTON_LONG_PRESS_BIT					BIT2
 #define BUTTON_DOUBLE_CLICK_PRESS_BIT	BIT3
 
-#define ENABLE_LOG
-
 /* Private function prototypes -----------------------------------------------*/
 static void IRAM_ATTR isr_handler(void * arg);
 static void button_task (void * arg);
@@ -227,7 +225,7 @@ esp_err_t button_remove_cb(button_t *const me, button_click_e click_type) {
 	return ret;
 }
 /* Private functions ---------------------------------------------------------*/
-static void IRAM_ATTR isr_handler(void *arg) {
+static void isr_handler(void *arg) {
 	button_t *button = (button_t *)arg;
 
 	static TickType_t elapsed_time = 0;
@@ -244,9 +242,9 @@ static void IRAM_ATTR isr_handler(void *arg) {
 			else {
 				/* Calculate and print button elapsed time pressed */
 				elapsed_time = pdTICKS_TO_MS(xTaskGetTickCountFromISR() - button->tick_counter);
-#ifdef ENABLE_LOG
+#ifdef BUTTON_ENABLE_DEBUG
 				ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
-#endif
+#endif /* BUTTON_ENABLE_DEBUG */
 
 				/* Execute function callback according button elapsed time pressed */
 				if (elapsed_time >= CONFIG_BUTTON_DEBOUNCE_SHORT_TIME && elapsed_time < CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME) {
@@ -268,9 +266,9 @@ static void IRAM_ATTR isr_handler(void *arg) {
 					xEventGroupSetBitsFromISR(button->event_group, BUTTON_LONG_PRESS_BIT, NULL);
 				}
 				else {
-#ifdef ENABLE_LOG
+#ifdef BUTTON_ENABLE_DEBUG
 					ESP_DRAM_LOGI(TAG, "button %d bounce", button->gpio);
-#endif
+#endif /* BUTTON_ENABLE_DEBUG */
 					break;
 				}
 
@@ -290,9 +288,9 @@ static void IRAM_ATTR isr_handler(void *arg) {
 			if (button->edge == BUTTON_EDGE_FALLING) {
 				/* Calculate and print button elapsed time pressed */
 				elapsed_time = pdTICKS_TO_MS(xTaskGetTickCountFromISR() - button->tick_counter);
-#ifdef ENABLE_LOG
+#ifdef BUTTON_ENABLE_DEBUG
 				ESP_DRAM_LOGI(TAG, "button %d pressed for %d ms", button->gpio, elapsed_time);
-#endif
+#endif /* BUTTON_ENABLE_DEBUG */
 
 				/* Execute function callback according button elapsed time pressed */
 				if (elapsed_time >= CONFIG_BUTTON_DEBOUNCE_SHORT_TIME && elapsed_time < CONFIG_BUTTON_DEBOUNCE_MEDIUM_TIME) {
@@ -314,9 +312,9 @@ static void IRAM_ATTR isr_handler(void *arg) {
 					xEventGroupSetBitsFromISR(button->event_group, BUTTON_LONG_PRESS_BIT, NULL);
 				}
 				else {
-#ifdef ENABLE_LOG
+#ifdef BUTTON_ENABLE_DEBUG
 					ESP_DRAM_LOGI(TAG, "button %d bounce", button->gpio);
-#endif
+#endif /* BUTTON_ENABLE_DEBUG */
 					break;
 				}
 
