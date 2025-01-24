@@ -14,7 +14,7 @@ To use this component follow the next steps:
 1. Configure the component in the project configuration menu (`idf.py menuconfig`)
 
 `
-Component config-->Button Configuration
+Component config->Button Configuration
 `
 
 2. Include the component header
@@ -43,18 +43,22 @@ void button2_cb(void *arg) {
 5. Initialize the component instances
 ```c
 /* Initialize button instances */
-ESP_ERROR_CHECK(button_init(&button1, /* Button instance */
+ESP_ERROR_CHECK(button_init(
+    &button1,                         /* Button instance */
     GPIO_NUM_0,                       /* Button GPIO number */
+    BUTTON_EDGE_FALLING,              /* Button edge interrupt */
     tskIDLE_PRIORITY + 10,            /* Button FreeRTOS task priority */
     configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
 
-ESP_ERROR_CHECK(button_init(&button2, /* Button instance */
+ESP_ERROR_CHECK(button_init(
+    &button2,                         /* Button instance */
     GPIO_NUM_21,                      /* Button GPIO number */
+    BUTTON_EDGE_RISING,              /* Button edge interrupt */
     tskIDLE_PRIORITY + 11,            /* Button FreeRTOS task priority */
     configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
 ```
 
-6. Add the callback functions defined in 3
+6. Add the callback functions defined in 4
 ```c
  /* Register button1 callback for single click without argument */
 button_add_cb(&button1, BUTTON_CLICK_SINGLE, button1_cb, NULL);
