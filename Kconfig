@@ -1,4 +1,9 @@
 menu "Button Configuration"
+	config BUTTON_ENABLE_DEBUG
+		int "Enable debug"
+		default 0
+		help
+			Enable button status debug log.
 
     config BUTTON_DEBOUNCE_SHORT_TIME
         int "Short time"
