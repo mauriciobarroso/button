@@ -1,4 +1,4 @@
-# Button Driver for ESP32 and STM32 Devices over FreeRTOS
+# Button Driver for Tactile Switches Buttons Compatible with ESP-IDF and STM32CubeIDE
 
 A lightweight, FreeRTOS-based button driver for ESP32 and STM32 platforms. Provides robust debouncing, event detection, and deferred callback dispatch with minimal RTOS overhead.
 
@@ -9,6 +9,7 @@ A lightweight, FreeRTOS-based button driver for ESP32 and STM32 platforms. Provi
 * **Efficient RTOS usage**: only one software timer, one queue, and one dispatcher task required
 * **Configurable dispatcher**: set task priority, stack size, and dispatch interval to suit your application
 * **Compile-time scaling**: define the maximum number of button instances for optimized resource allocation
+* **Ready for ESP-IDF**: made to be integrated as component in ESP-IDF projects
 
 ## Examples
 
