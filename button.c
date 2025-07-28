@@ -103,7 +103,7 @@
 /* FSM utils */
 static uint32_t get_ms(void);
 static bool eval_eq(int a, int b);
-static void set_fsm(button_t *button);
+static void fsm_set(button_t *button);
 static void timer_handler(TimerHandle_t timer);
 
 /* FSM actions */
@@ -172,7 +172,7 @@ button_err_t button_init(button_t *const me, int gpio_num, int gpio_port) {
   }
 
   /* Initialize and configure FSM */
-  set_fsm(me);
+  fsm_set(me);
 
   /* Initialize queue, task and timer */
   err = dispatcher_init();
@@ -329,7 +329,7 @@ static uint32_t get_ms(void) {
 
 static bool eval_eq(int a, int b) { return (a == b); }
 
-static void set_fsm(button_t *button) {
+static void fsm_set(button_t *button) {
   fsm_init(&button->fsm, BUTTON_STATE_IDLE, get_ms);
 
   fsm_trans_t *trans;
