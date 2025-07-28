@@ -1,0 +1,5 @@
+menu "Application Configuration"
+	config BUTTON_GPIO_NUM
+		int "GPIO number"
+		default 0
+endmenu
