@@ -1,26 +1,35 @@
 menu "Button Configuration"
-	config BUTTON_ENABLE_DEBUG
-		int "Enable debug"
-		default 0
-		help
-			Enable button status debug log.
+	
+    config BUTTON_NUM_MAX
+        int "Button maximum number"
+        default 4
+        help
+        	Set maximum number of buttons allowed.
 
-    config BUTTON_DEBOUNCE_SHORT_TIME
-        int "Short time"
-        default 30
+    config BUTTON_TICK_MS
+        int "Button Tick"
+        default 10
         help
-        	Set short button press time in miliseconds.
-        	
-    config BUTTON_DEBOUNCE_MEDIUM_TIME
-        int "Medium time"
-        default 3000
-        help
-        	Set medium button press time in miliseconds.
-        	
-    config BUTTON_DEBOUNCE_LONG_TIME
-        int "Long time"
-        default 10000
-        help
-        	Set short button press time in miliseconds.
+          Set the button FSM tick time in ms.
+
+    menu "Dispatcher"
+        config BUTTON_TASK_PRIORITY
+            int "Button task priority"
+            default 1
+            help
+              Set the dispatcher task priority.
+
+        config BUTTON_TASK_STACK_SIZE
+            int "Button task stack size"
+            default 4096
+            help
+              Set the dispatcher task stack size.
+
+        config BUTTON_QUEUE_LEN
+            int "Button queue lenght"
+            default 10
+            help
+              Set the dispatcher queue items length.
+    endmenu
 
 endmenu
