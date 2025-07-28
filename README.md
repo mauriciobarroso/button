@@ -1,77 +1,73 @@
+# Button Driver for ESP32 and STM32 Devices over FreeRTOS
 
-# ESP-IDF Button Component
-ESP-IDF component to configure and use several tactile switches 
+A lightweight, FreeRTOS-based button driver for ESP32 and STM32 platforms. Provides robust debouncing, event detection, and deferred callback dispatch with minimal RTOS overhead.
 
 ## Features
-- Each button support up to four different callback functions depending on the way the button is pressed (single, medium, long and double).
-- Debounce algorithm is based on FSM (Finite State Machine), FreeRTOS software timers, FreeRTOS event groups and GPIO interrupts.
-- Support pull-up and pull-down button configurations.
-- Multiple instances.
+
+* **Event detection**: single-click, double-click, press, hold, and long-press
+* **Adjustable timings**: debounce interval, double-click window, hold and long-press durations
+* **Efficient RTOS usage**: only one software timer, one queue, and one dispatcher task required
+* **Configurable dispatcher**: set task priority, stack size, and dispatch interval to suit your application
+* **Compile-time scaling**: define the maximum number of button instances for optimized resource allocation
+
+## Examples
+
+* [Print press type](examples/print_press_type)
 
 ## How to use
-To use this component follow the next steps:
 
-1. Configure the component in the project configuration menu (`idf.py menuconfig`)
+A quick guide to use a single button and define its associated actions.
 
-`
-Component config->Button Configuration
-`
+1. **Define a button instance**
 
-2. Include the component header
-```c
-#include "button.h"
-```
-3. Create one or more instance of the component
-```c
-button_t button1;
-button_t button2; 
-```
+   ```c
+   button_t button;
+   ```
 
-4. Define button callback functions
-```c
-/* Callback function to handle press of button 1 without argument*/
-void button1_cb(void *arg) {
-    printf("Button 1 single click");
-}
+2. **Initialize the button**
 
-/* Callback function to handle press of button 2 with argument*/
-void button2_cb(void *arg) {
-    printf("%s\n", (char *)arg);
-}
-```
+   ```c
+   /* Replace GPIO_NUM and GPIO_PORT with your hardware definitions */
+   button_init(&button, GPIO_NUM, GPIO_PORT);
+   ```
 
-5. Initialize the component instances
-```c
-/* Initialize button instances */
-ESP_ERROR_CHECK(button_init(
-    &button1,                         /* Button instance */
-    GPIO_NUM_0,                       /* Button GPIO number */
-    BUTTON_EDGE_FALLING,              /* Button edge interrupt */
-    tskIDLE_PRIORITY + 10,            /* Button FreeRTOS task priority */
-    configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
+3. **Register callbacks for each event**
 
-ESP_ERROR_CHECK(button_init(
-    &button2,                         /* Button instance */
-    GPIO_NUM_21,                      /* Button GPIO number */
-    BUTTON_EDGE_RISING,              /* Button edge interrupt */
-    tskIDLE_PRIORITY + 11,            /* Button FreeRTOS task priority */
-    configMINIMAL_STACK_SIZE * 4));   /* Button FreeRTOS task stack size */
-```
+   ```c
+   void on_single(void *arg)  { /* handle single click */ }
+   void on_double(void *arg)  { /* handle double click */ }
 
-6. Add the callback functions defined in 4
-```c
- /* Register button1 callback for single click without argument */
-button_add_cb(&button1, BUTTON_CLICK_SINGLE, button1_cb, NULL);
- 
- /* Register button2 callbacks for medium and double click with different arguments */
-button_add_cb(&button2, BUTTON_CLICK_MEDIUM, button2_cb, "Button 2 medium click");
-button_add_cb(&button2, BUTTON_CLICK_DOUBLE, button2_cb, "Button 2 double click");
-```
+   button_register_action(&button, BUTTON_TYPE_SINGLE, on_single,  NULL);
+   button_register_action(&button, BUTTON_TYPE_DOUBLE, on_double,  NULL);
+   ```
+
+4. **Unregister unwanted callbacks**
+
+   ```c
+   button_unregister_action(&button, BUTTON_TYPE_DOUBLE);
+   ```
+
+5. **Deinitialize when done**
+
+   ```c
+   button_deinit(&button);
+   ```
+
+## Dependencies
+
+* [FSM Library for Embedded C Projects](https://github.com/mauriciobarroso/fsm)
+
+## Roadmap
+
+* Implement button priority levels and conflict resolution
+* Add support for bare-metal (no-RTOS) environments
+* Provide keypad matrix and ADC-based button drivers
 
 ## License
+
 MIT License
 
-Copyright (c) 2022 Mauricio Barroso Benavides
+Copyright (c) 2025 Mauricio Barroso Benavides
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -80,8 +76,8 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -90,4 +86,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
