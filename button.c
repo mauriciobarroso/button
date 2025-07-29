@@ -36,11 +36,14 @@
 /* Includes ------------------------------------------------------------------*/
 #include "button.h"
 
+#ifdef ESP32_TARGET
+#include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/timers.h"
-
-#include "driver/gpio.h"
+#else
+#include "main.h"
+#endif /* ESP32_TARGET */
 
 /* External variables --------------------------------------------------------*/
 
@@ -504,6 +507,7 @@ static void dispatcher_send(button_t *button, button_type_t type) {
 static button_err_t generic_gpio_init(uint8_t num, uint8_t port) {
   button_err_t err = BUTTON_ERR_OK;
 
+#ifdef ESP32_TARGET
   gpio_config_t gpio_cfg;
   gpio_cfg.pin_bit_mask = 1ULL << num;
   gpio_cfg.mode = GPIO_MODE_INPUT;
@@ -511,6 +515,7 @@ static button_err_t generic_gpio_init(uint8_t num, uint8_t port) {
   gpio_cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
   gpio_cfg.intr_type = GPIO_INTR_DISABLE;
   err = gpio_config(&gpio_cfg);
+#endif /* ESP32_TARGET */
 
   if (err == ESP_ERR_INVALID_ARG) {
     return BUTTON_ERR_INVALID_PARAM;
@@ -524,7 +529,9 @@ static button_err_t generic_gpio_init(uint8_t num, uint8_t port) {
 }
 
 static int generic_gpio_get_level(uint8_t num, uint8_t port) {
+#ifdef ESP32_TARGET
   return gpio_get_level(num);
+#endif /* ESP32_TARGET */
 }
 
 /***************************** END OF FILE ************************************/

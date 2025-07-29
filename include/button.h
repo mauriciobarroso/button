@@ -42,10 +42,16 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "fsm.h"
-
 #include <stdio.h>
 #include <string.h>
+#include "fsm.h"
+
+#if CONFIG_IDF_TARGET_ESP32 || CONFIG_IDF_TARGET_ESP32S2 ||                    \
+    CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32C2 ||                  \
+    CONFIG_IDF_TARGET_ESP32C3 || CONFIG_IDF_TARGET_ESP32C6 ||                  \
+    CONFIG_IDF_TARGET_ESP32P4
+#define ESP32_TARGET
+#endif
 
 /* Exported types ------------------------------------------------------------*/
 typedef enum {
